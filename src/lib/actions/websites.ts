@@ -62,6 +62,77 @@ export async function createWebsite(data: WebsiteFormData) {
     return inserted
 }
 
+export async function updateWebsite(id: string, data: WebsiteFormData) {
+    const supabase = await createClient()
+
+    // 1. Get current website to check for price changes
+    const { data: current, error: getError } = await supabase
+        .from('websites')
+        .select('*')
+        .eq('id', id)
+        .single()
+
+    if (getError) throw getError
+
+    // 2. Check if prices changed
+    const priceChanged =
+        current.gp_price !== data.gp_price ||
+        current.li_price !== data.li_price ||
+        current.homepage_price !== data.homepage_price ||
+        current.secondary_price !== data.secondary_price ||
+        current.currency !== data.currency
+
+    let updatedPriceHistory = current.price_history || []
+    let lastPriceUpdate = current.last_price_updated
+
+    if (priceChanged) {
+        lastPriceUpdate = new Date().toISOString()
+        updatedPriceHistory = [
+            {
+                date: lastPriceUpdate,
+                gp: data.gp_price,
+                li: data.li_price,
+                homepage: data.homepage_price,
+                secondary: data.secondary_price,
+                currency: data.currency,
+                changed_by: 'Admin' // Should be dynamic in full auth version
+            },
+            ...updatedPriceHistory
+        ].slice(0, 20) // Keep last 20 entries
+    }
+
+    // 3. Update website
+    const { data: updated, error } = await supabase
+        .from('websites')
+        .update({
+            ...data,
+            last_price_updated: lastPriceUpdate,
+            price_history: updatedPriceHistory,
+            updated_at: new Date().toISOString()
+        })
+        .eq('id', id)
+        .select()
+        .single()
+
+    if (error) throw error
+
+    // 4. Log Activity
+    await supabase.from('activity_logs').insert([
+        {
+            action: 'update',
+            module: 'websites',
+            record_id: id,
+            record_label: updated.website_url,
+            details: { url: updated.website_url, price_changed: priceChanged }
+        }
+    ])
+
+    revalidatePath('/websites')
+    revalidatePath('/')
+
+    return updated
+}
+
 export async function getWebsites(filters?: any) {
     const supabase = await createClient()
 
@@ -96,12 +167,27 @@ export async function getWebsites(filters?: any) {
 export async function deleteWebsite(id: string) {
     const supabase = await createClient()
 
+    // Get label before deletion
+    const { data: website } = await supabase.from('websites').select('website_url').eq('id', id).single()
+
     const { error } = await supabase
         .from('websites')
         .delete()
         .eq('id', id)
 
     if (error) throw error
+
+    // Log Activity
+    if (website) {
+        await supabase.from('activity_logs').insert([
+            {
+                action: 'delete',
+                module: 'websites',
+                record_id: id,
+                record_label: website.website_url
+            }
+        ])
+    }
 
     revalidatePath('/websites')
     revalidatePath('/')

@@ -1,5 +1,3 @@
-'use client'
-
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Header } from '@/components/layout/Header'
@@ -13,7 +11,9 @@ import {
     ExternalLink,
     CheckCircle2,
     XCircle,
-    AlertTriangle
+    AlertTriangle,
+    Edit,
+    Trash2
 } from 'lucide-react'
 import {
     cn,
@@ -24,8 +24,11 @@ import {
     getSpamColor,
     getStatusBadgeClass
 } from '@/lib/utils'
-import { CATEGORIES, Website } from '@/lib/types'
-import { getWebsites } from '@/lib/actions/websites'
+import { CATEGORIES, Website, WebsiteFormData } from '@/lib/types'
+import { getWebsites, updateWebsite, deleteWebsite } from '@/lib/actions/websites'
+import { Modal } from '@/components/ui/Modal'
+import { WebsiteForm } from '@/components/inventory/WebsiteForm'
+import { toast } from 'sonner'
 
 export default function WebsitesPage() {
     const [search, setSearch] = useState('')
@@ -33,25 +36,61 @@ export default function WebsitesPage() {
     const [websites, setWebsites] = useState<Website[]>([])
     const [isLoading, setIsLoading] = useState(true)
 
-    useEffect(() => {
-        const fetchSites = async () => {
-            setIsLoading(true)
-            try {
-                const data = await getWebsites({
-                    search,
-                    category: selectedCategory === 'All' ? 'all' : selectedCategory
-                })
-                setWebsites(data as any)
-            } catch (error) {
-                console.error(error)
-            } finally {
-                setIsLoading(false)
-            }
-        }
+    // Modal states
+    const [editingWebsite, setEditingWebsite] = useState<Website | null>(null)
+    const [isDeleting, setIsDeleting] = useState<string | null>(null)
+    const [isSubmitting, setIsSubmitting] = useState(false)
 
+    const fetchSites = async () => {
+        setIsLoading(true)
+        try {
+            const data = await getWebsites({
+                search,
+                category: selectedCategory === 'All' ? 'all' : selectedCategory
+            })
+            setWebsites(data as any)
+        } catch (error) {
+            toast.error('Failed to fetch inventory')
+        } finally {
+            setIsLoading(false)
+        }
+    }
+
+    useEffect(() => {
         const timer = setTimeout(fetchSites, 300)
         return () => clearTimeout(timer)
     }, [search, selectedCategory])
+
+    const handleEditWebsite = async (data: WebsiteFormData) => {
+        if (!editingWebsite) return
+        setIsSubmitting(true)
+        const toastId = toast.loading('Updating website...')
+        try {
+            await updateWebsite(editingWebsite.id, data)
+            toast.success('Website updated successfully', { id: toastId })
+            setEditingWebsite(null)
+            fetchSites()
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'Failed to update website', { id: toastId })
+        } finally {
+            setIsSubmitting(false)
+        }
+    }
+
+    const handleDeleteWebsite = async (id: string) => {
+        if (!confirm('Are you sure you want to delete this website? This will also remove its order history reference.')) return
+        setIsDeleting(id)
+        const toastId = toast.loading('Deleting website...')
+        try {
+            await deleteWebsite(id)
+            toast.success('Website deleted successfully', { id: toastId })
+            fetchSites()
+        } catch (error) {
+            toast.error('Failed to delete website', { id: toastId })
+        } finally {
+            setIsDeleting(null)
+        }
+    }
 
     return (
         <div className="flex flex-col h-full">
@@ -104,22 +143,11 @@ export default function WebsitesPage() {
                                 <option key={cat} value={cat}>{cat}</option>
                             ))}
                         </select>
-
-                        <select className="form-select text-xs h-9 min-w-[120px]">
-                            <option value="">All Types</option>
-                            <option value="general">General</option>
-                            <option value="pure_niche">Pure Niche</option>
-                        </select>
-
-                        <button className="btn btn-secondary h-9">
-                            <Filter className="w-3.5 h-3.5" />
-                            More Filters
-                        </button>
                     </div>
 
                     <div className="ml-auto flex items-center gap-2">
                         <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Sort by:</span>
-                        <select className="form-select text-xs h-9 border-none bg-transparent font-semibold pr-8">
+                        <select className="form-select text-xs h-9 border-none bg-transparent font-semibold pr-8 cursor-pointer">
                             <option>DA (High to Low)</option>
                             <option>Price (Low to High)</option>
                             <option>Traffic (High to Low)</option>
@@ -130,7 +158,7 @@ export default function WebsitesPage() {
 
                 {/* Table Area */}
                 <div className="table-wrapper relative min-h-[400px]">
-                    {isLoading && (
+                    {(isLoading || isDeleting) && (
                         <div className="absolute inset-0 bg-bg-primary/50 flex items-center justify-center z-10 backdrop-blur-[1px]">
                             <div className="spinner w-8 h-8" />
                         </div>
@@ -148,22 +176,25 @@ export default function WebsitesPage() {
                                 <th>Pricing (USD)</th>
                                 <th>Status</th>
                                 <th>TAT</th>
-                                <th className="w-10"></th>
+                                <th className="w-10 text-right pr-6">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             {!isLoading && websites.length === 0 && (
                                 <tr>
-                                    <td colSpan={8} className="py-20 text-center">
-                                        <div className="flex flex-col items-center gap-3 text-muted-foreground">
-                                            <Search size={40} className="opacity-20" />
-                                            <p>No websites found matching your criteria.</p>
+                                    <td colSpan={8} className="py-24">
+                                        <div className="flex flex-col items-center text-center max-w-sm mx-auto">
+                                            <div className="w-16 h-16 rounded-full bg-bg-secondary flex items-center justify-center mb-4 text-muted-foreground/30">
+                                                <Search size={32} />
+                                            </div>
+                                            <h3 className="text-lg font-bold mb-1">No websites found</h3>
+                                            <p className="text-sm text-muted-foreground">We couldn't find any publisher sites matching your current filters or search query.</p>
                                         </div>
                                     </td>
                                 </tr>
                             )}
                             {websites.map((site) => (
-                                <tr key={site.id}>
+                                <tr key={site.id} className="group">
                                     <td>
                                         <input type="checkbox" className="rounded border-border bg-bg-secondary" />
                                     </td>
@@ -257,9 +288,20 @@ export default function WebsitesPage() {
                                         </div>
                                     </td>
                                     <td>
-                                        <button className="btn-icon btn-ghost">
-                                            <MoreVertical className="w-4 h-4" />
-                                        </button>
+                                        <div className="flex items-center justify-end gap-1 pr-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <button
+                                                className="btn-icon btn-ghost btn-sm"
+                                                onClick={() => setEditingWebsite(site)}
+                                            >
+                                                <Edit size={14} />
+                                            </button>
+                                            <button
+                                                className="btn-icon btn-ghost btn-sm text-danger hover:bg-danger/10"
+                                                onClick={() => handleDeleteWebsite(site.id)}
+                                            >
+                                                <Trash2 size={14} />
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                             ))}
@@ -279,6 +321,23 @@ export default function WebsitesPage() {
                     </div>
                 </div>
             </div>
+
+            {/* Edit Modal */}
+            <Modal
+                isOpen={!!editingWebsite}
+                onClose={() => setEditingWebsite(null)}
+                title="Edit Website Details"
+                className="max-w-4xl"
+            >
+                {editingWebsite && (
+                    <WebsiteForm
+                        initialData={editingWebsite}
+                        onCancel={() => setEditingWebsite(null)}
+                        onSubmit={handleEditWebsite}
+                        isLoading={isSubmitting}
+                    />
+                )}
+            </Modal>
         </div>
     )
 }

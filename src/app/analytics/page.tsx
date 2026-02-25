@@ -1,95 +1,238 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { Header } from '@/components/layout/Header'
-import { BarChart3, TrendingUp, Users, Globe, Download, Calendar } from 'lucide-react'
+import {
+    Download,
+    TrendingUp,
+    ArrowUpRight,
+    ArrowDownRight,
+    DollarSign,
+    ShoppingCart,
+    Target,
+    BarChart3
+} from 'lucide-react'
+import { cn, formatCurrency } from '@/lib/utils'
+import {
+    AreaChart,
+    Area,
+    XAxis,
+    YAxis,
+    CartesianGrid,
+    Tooltip,
+    ResponsiveContainer,
+    PieChart,
+    Pie,
+    Cell
+} from 'recharts'
+import { getAnalyticsStats } from '@/lib/actions/analytics'
 
 export default function AnalyticsPage() {
+    const [stats, setStats] = useState<any>(null)
+    const [isLoading, setIsLoading] = useState(true)
+
+    useEffect(() => {
+        async function load() {
+            setIsLoading(true)
+            try {
+                const data = await getAnalyticsStats()
+                setStats(data)
+            } catch (err) {
+                console.error(err)
+            } finally {
+                setIsLoading(false)
+            }
+        }
+        load()
+    }, [])
+
+    if (isLoading || !stats) {
+        return (
+            <div className="flex flex-col h-full">
+                <Header title="Performance Analytics" subtitle="Real-time business intelligence and financial reporting." />
+                <div className="page-body flex items-center justify-center min-h-[400px]">
+                    <div className="spinner w-8 h-8" />
+                </div>
+            </div>
+        )
+    }
+
     return (
         <div className="flex flex-col h-full">
             <Header
-                title="Reporting & Analytics"
-                subtitle="Deep dive into your guest posting performance and business growth."
+                title="Performance Analytics"
+                subtitle="Real-time business intelligence and financial reporting."
             />
 
-            <div className="page-body">
-                <div className="flex items-center justify-between mb-8">
-                    <h1 className="text-2xl font-bold tracking-tight">Analytics Dashboard</h1>
-                    <div className="flex gap-2">
-                        <button className="btn btn-secondary text-xs h-9">
-                            <Calendar className="w-3.5 h-3.5" />
-                            Last 12 Months
-                        </button>
-                        <button className="btn btn-primary text-xs h-9">
-                            <Download className="w-3.5 h-3.5" />
-                            Export Report
-                        </button>
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                    <div className="card h-[350px] flex flex-col">
-                        <h3 className="card-title mb-1">Revenue vs Profit Growth</h3>
-                        <p className="text-xs text-muted-foreground mb-4">Comparison of gross income and net profit over time.</p>
-                        <div className="flex-1 border border-dashed border-border rounded-lg bg-bg-secondary/50 flex items-center justify-center">
-                            <p className="text-sm text-muted-foreground italic">Area Chart (Recharts)</p>
+            <div className="page-body pb-10">
+                {/* Filters & Export */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+                    <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-2 p-1 bg-bg-secondary rounded-lg border border-border">
+                            <button className="px-4 py-1.5 text-xs font-bold bg-accent text-white rounded-md shadow-sm">Last 6 Months</button>
+                            <button className="px-4 py-1.5 text-xs font-bold text-muted-foreground hover:text-text-primary">Year to Date</button>
                         </div>
                     </div>
-                    <div className="card h-[350px] flex flex-col">
-                        <h3 className="card-title mb-1">Order Volume by Category</h3>
-                        <p className="text-xs text-muted-foreground mb-4">Which niches are performing the best for your agency.</p>
-                        <div className="flex-1 border border-dashed border-border rounded-lg bg-bg-secondary/50 flex items-center justify-center">
-                            <p className="text-sm text-muted-foreground italic">Bar Chart (Recharts)</p>
-                        </div>
-                    </div>
+
+                    <button className="btn btn-secondary">
+                        <Download className="w-4 h-4" />
+                        Export Full Report
+                    </button>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* Key Metrics */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <MetricCard
+                        label="Total Revenue"
+                        value={formatCurrency(stats.summary.totalRevenue)}
+                        icon={DollarSign}
+                        trend="+12.5%"
+                        isUp={true}
+                        color="text-success"
+                    />
+                    <MetricCard
+                        label="Net Profit"
+                        value={formatCurrency(stats.summary.totalProfit)}
+                        icon={TrendingUp}
+                        trend="+8.2%"
+                        isUp={true}
+                        color="text-accent"
+                    />
+                    <MetricCard
+                        label="Order Volume"
+                        value={`${stats.summary.totalOrders}`}
+                        icon={ShoppingCart}
+                        trend="+5.4%"
+                        isUp={true}
+                        color="text-info"
+                    />
+                    <MetricCard
+                        label="Avg. Margin"
+                        value={`${stats.summary.avgMargin.toFixed(1)}%`}
+                        icon={Target}
+                        trend="+1.2%"
+                        isUp={true}
+                        color="text-warning"
+                    />
+                </div>
+
+                {/* Charts Area */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    {/* Revenue & Profit Chart */}
+                    <div className="lg:col-span-2 card">
+                        <div className="flex items-center justify-between mb-8">
+                            <div>
+                                <h3 className="text-lg font-bold flex items-center gap-2">
+                                    <BarChart3 size={18} className="text-accent" />
+                                    Growth Trends
+                                </h3>
+                                <p className="text-xs text-muted-foreground">Monthly revenue and profit performance</p>
+                            </div>
+                        </div>
+
+                        <div className="h-[350px] w-full">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <AreaChart data={stats.chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                                    <defs>
+                                        <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} />
+                                            <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
+                                        </linearGradient>
+                                        <linearGradient id="colorProfit" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                                            <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                                        </linearGradient>
+                                    </defs>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#374151" />
+                                    <XAxis
+                                        dataKey="name"
+                                        axisLine={false}
+                                        tickLine={false}
+                                        tick={{ fontSize: 10, fill: '#9ca3af' }}
+                                        dy={10}
+                                    />
+                                    <YAxis
+                                        axisLine={false}
+                                        tickLine={false}
+                                        tick={{ fontSize: 10, fill: '#9ca3af' }}
+                                    />
+                                    <Tooltip
+                                        contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
+                                        itemStyle={{ fontSize: '12px' }}
+                                    />
+                                    <Area type="monotone" dataKey="revenue" stroke="#8b5cf6" strokeWidth={3} fillOpacity={1} fill="url(#colorRevenue)" />
+                                    <Area type="monotone" dataKey="profit" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorProfit)" />
+                                </AreaChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
+
+                    {/* Order Status Breakdown */}
                     <div className="card">
-                        <h3 className="card-title mb-4">Top Clients by Revenue</h3>
-                        <div className="space-y-3">
-                            {[1, 2, 3].map(i => (
-                                <div key={i} className="flex items-center justify-between p-2 rounded-lg hover:bg-bg-hover transition-colors">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 rounded-full bg-accent-subtle flex items-center justify-center text-[10px] font-bold text-accent">C{i}</div>
-                                        <span className="text-xs font-medium">Digital Pulse Agency</span>
+                        <div className="mb-8">
+                            <h3 className="text-lg font-bold flex items-center gap-2">
+                                <ShoppingCart size={18} className="text-info" />
+                                Fulfillment Status
+                            </h3>
+                            <p className="text-xs text-muted-foreground">Distribution of order statuses</p>
+                        </div>
+
+                        <div className="h-[250px] w-full">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
+                                    <Pie
+                                        data={stats.statusData}
+                                        cx="50%"
+                                        cy="50%"
+                                        innerRadius={60}
+                                        outerRadius={80}
+                                        paddingAngle={5}
+                                        dataKey="value"
+                                    >
+                                        {stats.statusData.map((entry: any, index: number) => (
+                                            <Cell key={`cell-${index}`} fill={entry.color} />
+                                        ))}
+                                    </Pie>
+                                    <Tooltip
+                                        contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
+                                    />
+                                </PieChart>
+                            </ResponsiveContainer>
+                        </div>
+
+                        <div className="mt-8 space-y-3">
+                            {stats.statusData.map((s: any) => (
+                                <div key={s.name} className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: s.color }} />
+                                        <span className="text-xs font-medium text-muted-foreground">{s.name}</span>
                                     </div>
-                                    <span className="text-xs font-bold text-success">$14,200</span>
+                                    <span className="text-xs font-bold">{s.value}</span>
                                 </div>
                             ))}
                         </div>
                     </div>
-                    <div className="card">
-                        <h3 className="card-title mb-4">Most Used Websites</h3>
-                        <div className="space-y-3">
-                            {[1, 2, 3].map(i => (
-                                <div key={i} className="flex items-center justify-between p-2 rounded-lg hover:bg-bg-hover transition-colors">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 rounded bg-bg-hover flex items-center justify-center text-[10px] font-bold text-muted-foreground">{i}</div>
-                                        <span className="text-xs font-medium">forbes.com</span>
-                                    </div>
-                                    <span className="text-xs font-bold text-info">42nd Order</span>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                    <div className="card">
-                        <h3 className="card-title mb-4">Profit Margin Stats</h3>
-                        <div className="flex flex-col items-center justify-center h-[120px]">
-                            <p className="text-3xl font-extrabold text-text-primary">34.2%</p>
-                            <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1 font-bold">Average Margin</p>
-                        </div>
-                        <div className="mt-2 pt-2 border-t border-border space-y-2">
-                            <div className="flex justify-between text-[10px]">
-                                <span className="text-muted-foreground">High Margin Category:</span>
-                                <span className="text-success font-bold">Health (42%)</span>
-                            </div>
-                            <div className="flex justify-between text-[10px]">
-                                <span className="text-muted-foreground">Low Margin Category:</span>
-                                <span className="text-danger font-bold">Finance (18%)</span>
-                            </div>
-                        </div>
-                    </div>
                 </div>
+            </div>
+        </div>
+    )
+}
+
+function MetricCard({ label, value, icon: Icon, trend, isUp, color }: any) {
+    return (
+        <div className="card group hover:scale-[1.02] transition-all duration-300">
+            <div className="flex items-start justify-between">
+                <div className={cn("p-2 rounded-lg bg-bg-secondary group-hover:bg-accent/10 transition-colors", color.replace('text', 'bg').replace('success', 'success/10').replace('accent', 'accent/10').replace('info', 'info/10').replace('warning', 'warning/10'))}>
+                    <Icon size={20} className={color} />
+                </div>
+                <div className={cn("flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold", isUp ? "bg-success/10 text-success" : "bg-danger/10 text-danger")}>
+                    {isUp ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
+                    {trend}
+                </div>
+            </div>
+            <div className="mt-4">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{label}</p>
+                <h4 className="text-2xl font-black mt-1 tracking-tight">{value}</h4>
             </div>
         </div>
     )

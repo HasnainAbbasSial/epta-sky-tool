@@ -4,159 +4,116 @@ import { useState } from 'react'
 import { Header } from '@/components/layout/Header'
 import {
     Download,
-    FileSpreadsheet,
     FileJson,
-    Check,
-    Settings,
-    Eye,
-    EyeOff,
-    Star
+    FileText,
+    Database,
+    CheckCircle2,
+    Globe,
+    Users,
+    ShoppingCart,
+    Filter
 } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn, downloadBlob } from '@/lib/utils'
+import { getWebsites } from '@/lib/actions/websites'
+import { getClients } from '@/lib/actions/clients'
+import { getOrders } from '@/lib/actions/orders'
+import { toast } from 'sonner'
 
 export default function ExportPage() {
-    const [isClientSafe, setIsClientSafe] = useState(true)
+    const [isExporting, setIsExporting] = useState<string | null>(null)
+
+    const handleExport = async (module: 'websites' | 'clients' | 'orders', format: 'json' | 'csv') => {
+        setIsExporting(`${module}-${format}`)
+        const toastId = toast.loading(`Generating ${module} ${format.toUpperCase()}...`)
+        try {
+            let data: any[] = []
+            if (module === 'websites') {
+                data = await getWebsites({}) as any[]
+            } else if (module === 'clients') {
+                // @ts-ignore - getClients currently takes params
+                data = await getClients({}) as any[]
+            } else if (module === 'orders') {
+                // @ts-ignore - getOrders currently takes params
+                data = await getOrders({}) as any[]
+            }
+
+            if (format === 'json') {
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+                downloadBlob(blob, `eptasky-${module}-${new Date().toISOString().split('T')[0]}.json`)
+            } else {
+                // Simple CSV conversion
+                if (data.length === 0) {
+                    toast.error('No data to export', { id: toastId })
+                    return
+                }
+                const headers = Object.keys(data[0]).join(',')
+                const rows = data.map(item =>
+                    Object.values(item).map(val => `"${String(val).replace(/"/g, '""')}"`).join(',')
+                ).join('\n')
+                const csv = `${headers}\n${rows}`
+                const blob = new Blob([csv], { type: 'text/csv' })
+                downloadBlob(blob, `eptasky-${module}-${new Date().toISOString().split('T')[0]}.csv`)
+            }
+            toast.success(`${module} exported successfully`, { id: toastId })
+        } catch (error) {
+            toast.error(`Failed to export ${module}`, { id: toastId })
+        } finally {
+            setIsExporting(null)
+        }
+    }
 
     return (
         <div className="flex flex-col h-full">
             <Header
-                title="Export Center"
-                subtitle="Generate custom reports and client-ready lists in seconds."
+                title="Data Export"
+                subtitle="Generate CSV and JSON reports for external use."
             />
 
-            <div className="page-body max-w-4xl mx-auto w-full">
-                <div className="flex items-center gap-3 mb-8">
-                    <Download className="w-8 h-8 text-accent" />
-                    <div>
-                        <h1 className="text-3xl font-bold tracking-tight">Export Data</h1>
-                        <p className="text-muted-foreground text-sm">Select column templates and format for your export.</p>
-                    </div>
+            <div className="page-body">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+                    <ExportCard
+                        title="Websites"
+                        description="Export your full publisher inventory."
+                        icon={Globe}
+                        onExport={(fmt: 'json' | 'csv') => handleExport('websites', fmt)}
+                        isExportingJson={isExporting === 'websites-json'}
+                        isExportingCsv={isExporting === 'websites-csv'}
+                    />
+                    <ExportCard
+                        title="Clients"
+                        description="Export your CRM database and contacts."
+                        icon={Users}
+                        onExport={(fmt: 'json' | 'csv') => handleExport('clients', fmt)}
+                        isExportingJson={isExporting === 'clients-json'}
+                        isExportingCsv={isExporting === 'clients-csv'}
+                    />
+                    <ExportCard
+                        title="Orders"
+                        description="Export historical transactions and profit data."
+                        icon={ShoppingCart}
+                        onExport={(fmt: 'json' | 'csv') => handleExport('orders', fmt)}
+                        isExportingJson={isExporting === 'orders-json'}
+                        isExportingCsv={isExporting === 'orders-csv'}
+                    />
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="md:col-span-2 space-y-6">
-                        <div className="card">
-                            <h3 className="section-title">1. Choose Module</h3>
-                            <div className="grid grid-cols-3 gap-3">
-                                <button className="flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-accent bg-accent-subtle text-accent">
-                                    <FileSpreadsheet />
-                                    <span className="text-xs font-bold">Websites</span>
-                                </button>
-                                <button className="flex flex-col items-center gap-2 p-4 rounded-xl border border-border bg-bg-secondary text-muted-foreground hover:bg-bg-hover">
-                                    <ShoppingCart className="w-5 h-5" />
-                                    <span className="text-xs font-bold">Orders</span>
-                                </button>
-                                <button className="flex flex-col items-center gap-2 p-4 rounded-xl border border-border bg-bg-secondary text-muted-foreground hover:bg-bg-hover">
-                                    <Users className="w-5 h-5" />
-                                    <span className="text-xs font-bold">Clients</span>
-                                </button>
-                            </div>
-                        </div>
-
-                        <div className="card">
-                            <div className="flex items-center justify-between mb-4">
-                                <h3 className="section-title mb-0">2. Configure Columns</h3>
-                                <button className="text-[10px] text-accent font-bold uppercase tracking-widest hover:underline">Select All</button>
-                            </div>
-
-                            <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
-                                {[
-                                    { id: 'url', label: 'Website URL', fixed: true },
-                                    { id: 'name', label: 'Website Name' },
-                                    { id: 'da', label: 'Domain Authority' },
-                                    { id: 'dr', label: 'Domain Rating' },
-                                    { id: 'traffic', label: 'Monthly Traffic' },
-                                    { id: 'gp_price', label: 'Guest Post Price', sensitive: true },
-                                    { id: 'li_price', label: 'Link Insertion Price', sensitive: true },
-                                    { id: 'publisher', label: 'Publisher Info', sensitive: true },
-                                    { id: 'categories', label: 'Categories' },
-                                    { id: 'tat', label: 'Turnaround Time' },
-                                ].map(col => (
-                                    <label key={col.id} className={cn(
-                                        "flex items-center gap-2 p-2.5 rounded-lg border text-xs cursor-pointer transition-all",
-                                        col.sensitive && isClientSafe && "opacity-40 grayscale pointer-events-none bg-bg-hover",
-                                        !col.sensitive ? "bg-bg-secondary hover:border-text-muted" : ""
-                                    )}>
-                                        <input type="checkbox" defaultChecked={!col.sensitive} disabled={col.sensitive && isClientSafe} className="rounded border-border bg-bg-secondary" />
-                                        <span className="flex-1">{col.label}</span>
-                                        {col.sensitive && <AlertCircle size={10} className="text-warning" />}
-                                    </label>
-                                ))}
-                            </div>
-                        </div>
+                <div className="card bg-bg-secondary/30 border-dashed">
+                    <div className="flex items-center gap-3 mb-4">
+                        <Database className="text-accent" size={20} />
+                        <h3 className="text-lg font-bold">Advanced Export Options</h3>
                     </div>
-
-                    <div className="space-y-6">
-                        <div className="card bg-accent-subtle/20 border-accent/20">
-                            <h3 className="card-title mb-4 flex items-center gap-2">
-                                <Settings className="w-4 h-4" />
-                                Export Mode
-                            </h3>
-                            <div className="space-y-4">
-                                <div
-                                    onClick={() => setIsClientSafe(true)}
-                                    className={cn(
-                                        "p-3 rounded-lg border cursor-pointer flex items-center gap-3 transition-all",
-                                        isClientSafe ? "bg-white text-black border-white shadow-glow" : "bg-bg-secondary border-border"
-                                    )}
-                                >
-                                    <div className={cn("p-1.5 rounded-md", isClientSafe ? "bg-black text-white" : "bg-muted text-muted-foreground")}>
-                                        <EyeOff size={14} />
-                                    </div>
-                                    <div>
-                                        <p className="text-xs font-bold">Client-Ready</p>
-                                        <p className="text-[9px] opacity-70">Hide sensitive data (prices, contacts)</p>
-                                    </div>
-                                    {isClientSafe && <Check size={14} className="ml-auto" />}
-                                </div>
-
-                                <div
-                                    onClick={() => setIsClientSafe(false)}
-                                    className={cn(
-                                        "p-3 rounded-lg border cursor-pointer flex items-center gap-3 transition-all",
-                                        !isClientSafe ? "bg-warning text-black border-warning shadow-lg" : "bg-bg-secondary border-border"
-                                    )}
-                                >
-                                    <div className={cn("p-1.5 rounded-md", !isClientSafe ? "bg-black text-white" : "bg-muted text-muted-foreground")}>
-                                        <Eye size={14} />
-                                    </div>
-                                    <div>
-                                        <p className="text-xs font-bold">Internal / Full</p>
-                                        <p className="text-[9px] opacity-70">Include all vendor info & prices</p>
-                                    </div>
-                                    {!isClientSafe && <Check size={14} className="ml-auto" />}
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="card">
-                            <h3 className="card-title mb-4">Export Format</h3>
-                            <div className="grid grid-cols-2 gap-2">
-                                <button className="flex items-center gap-2 p-3 rounded-lg border border-success/30 bg-success-subtle text-success text-xs font-bold">
-                                    <FileSpreadsheet size={16} />
-                                    EXCEL
-                                </button>
-                                <button className="flex items-center gap-2 p-3 rounded-lg border border-info/30 bg-info-subtle text-info text-xs font-bold">
-                                    <FileJson size={16} />
-                                    JSON
-                                </button>
-                            </div>
-                            <button className="btn btn-primary w-full mt-4 h-11 glow-accent">
-                                <Download size={18} />
-                                Download Export
-                            </button>
-                        </div>
-
-                        <div className="p-4 rounded-xl border border-dashed border-border bg-bg-secondary/30">
-                            <h4 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3 flex items-center gap-2">
-                                <Star size={10} className="fill-gold text-gold" />
-                                Saved Templates
-                            </h4>
-                            <div className="space-y-2">
-                                <p className="text-xs font-medium text-text-primary px-2 py-1.5 hover:bg-bg-hover rounded cursor-pointer">Technology List (Safe)</p>
-                                <p className="text-xs font-medium text-text-primary px-2 py-1.5 hover:bg-bg-hover rounded cursor-pointer">Finance Sites (Internal)</p>
-                            </div>
-                        </div>
+                    <p className="text-sm text-muted-foreground mb-6">
+                        Need filtered reports or custom date ranges? Use the main module pages to filter your search, then use the "Export" button there to get specific segments.
+                    </p>
+                    <div className="flex flex-wrap gap-3">
+                        <button className="btn btn-secondary gap-2" disabled>
+                            <Filter size={14} />
+                            Date Range Filter
+                        </button>
+                        <button className="btn btn-secondary gap-2" disabled>
+                            <CheckCircle2 size={14} />
+                            Only Completed
+                        </button>
                     </div>
                 </div>
             </div>
@@ -164,46 +121,31 @@ export default function ExportPage() {
     )
 }
 
-function ShoppingCart(props: any) {
+function ExportCard({ title, description, icon: Icon, onExport, isExportingJson, isExportingCsv }: any) {
     return (
-        <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="24" height="24"
-            viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" strokeWidth="2"
-            strokeLinecap="round" strokeLinejoin="round"
-            {...props}
-        >
-            <circle cx="8" cy="21" r="1" /><circle cx="19" cy="21" r="1" />
-            <path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12" />
-        </svg>
-    )
-}
-function AlertCircle(props: any) {
-    return (
-        <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="24" height="24"
-            viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" strokeWidth="2"
-            strokeLinecap="round" strokeLinejoin="round"
-            {...props}
-        >
-            <circle cx="12" cy="12" r="10" /><line x1="12" x2="12" y1="8" y2="12" /><line x1="12" x2="12.01" y1="16" y2="16" />
-        </svg>
-    )
-}
-function Users(props: any) {
-    return (
-        <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="24" height="24"
-            viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" strokeWidth="2"
-            strokeLinecap="round" strokeLinejoin="round"
-            {...props}
-        >
-            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
-        </svg>
+        <div className="card flex flex-col items-center text-center py-8 group hover:border-accent transition-colors">
+            <div className="w-16 h-16 rounded-2xl bg-bg-secondary flex items-center justify-center mb-6 text-accent group-hover:scale-110 transition-transform">
+                <Icon size={32} />
+            </div>
+            <h3 className="text-xl font-black mb-2">{title}</h3>
+            <p className="text-sm text-muted-foreground mb-8 max-w-[200px]">{description}</p>
+
+            <div className="w-full flex flex-col gap-2">
+                <button
+                    className={cn("btn btn-primary w-full gap-2", isExportingJson && "opacity-50")}
+                    onClick={() => onExport('json')}
+                >
+                    <FileJson size={16} />
+                    {isExportingJson ? 'Generating...' : 'Export as JSON'}
+                </button>
+                <button
+                    className={cn("btn btn-secondary w-full gap-2", isExportingCsv && "opacity-50")}
+                    onClick={() => onExport('csv')}
+                >
+                    <FileText size={16} />
+                    {isExportingCsv ? 'Generating...' : 'Export as CSV'}
+                </button>
+            </div>
+        </div>
     )
 }

@@ -1,11 +1,28 @@
-'use client'
-
 import { cn, formatCurrency } from '@/lib/utils'
 import { getDashboardStats } from '@/lib/actions/dashboard'
 import { useEffect, useState } from 'react'
 import { formatDistanceToNow } from 'date-fns'
 import { Header } from '@/components/layout/Header'
-import { Globe, Users, TrendingUp, ShoppingCart, AlertCircle, Clock, ArrowUpRight, ArrowDownRight } from 'lucide-react'
+import {
+  Globe,
+  Users,
+  TrendingUp,
+  ShoppingCart,
+  AlertCircle,
+  Clock,
+  ArrowUpRight,
+  ArrowDownRight,
+  LineChart as ChartIcon
+} from 'lucide-react'
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer
+} from 'recharts'
 
 export default function DashboardPage() {
   const [data, setData] = useState<any>(null)
@@ -25,7 +42,7 @@ export default function DashboardPage() {
     fetchData()
   }, [])
 
-  if (isLoading) {
+  if (isLoading || !data) {
     return (
       <div className="flex flex-col h-full">
         <Header
@@ -33,13 +50,13 @@ export default function DashboardPage() {
           subtitle="Loading your business statistics..."
         />
         <div className="flex-1 flex items-center justify-center">
-          <div className="spinner w-12 h-12" />
+          <div className="spinner w-10 h-10" />
         </div>
       </div>
     )
   }
 
-  const { stats, recentActivity } = data
+  const { stats, recentActivity, chartData } = data
 
   return (
     <div className="flex flex-col h-full">
@@ -57,7 +74,7 @@ export default function DashboardPage() {
             label="In Inventory"
             icon={Globe}
             trend="up"
-            color="bg-accent-subtle text-accent"
+            color="bg-accent/10 text-accent"
           />
           <StatsCard
             title="Total Clients"
@@ -65,15 +82,15 @@ export default function DashboardPage() {
             label="Registered CRM"
             icon={Users}
             trend="up"
-            color="bg-success-subtle text-success"
+            color="bg-success/10 text-success"
           />
           <StatsCard
-            title="Total Profit (Life)"
+            title="Total Profit"
             value={formatCurrency(stats.monthlyProfit)}
-            label="From all completed"
+            label="Life-time"
             icon={TrendingUp}
             trend="up"
-            color="bg-warning-subtle text-warning"
+            color="bg-warning/10 text-warning"
           />
           <StatsCard
             title="Active Orders"
@@ -81,47 +98,92 @@ export default function DashboardPage() {
             label="Tracking now"
             icon={ShoppingCart}
             trend="up"
-            color="bg-info-subtle text-info"
+            color="bg-info/10 text-info"
           />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
             <div className="card">
-              <div className="card-header">
-                <h3 className="card-title">Revenue & Profit Overview</h3>
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-1">
-                    <div className="w-3 h-3 rounded-full bg-accent" />
-                    <span className="text-[10px] text-muted-foreground">Revenue</span>
+              <div className="card-header pb-6">
+                <h3 className="card-title mt-0">Revenue & Profit Overview</h3>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-2.5 h-2.5 rounded-full bg-accent" />
+                    <span className="text-[10px] uppercase font-bold text-muted-foreground">Revenue</span>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <div className="w-3 h-3 rounded-full bg-success" />
-                    <span className="text-[10px] text-muted-foreground">Profit</span>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-2.5 h-2.5 rounded-full bg-success" />
+                    <span className="text-[10px] uppercase font-bold text-muted-foreground">Profit</span>
                   </div>
                 </div>
               </div>
-              <div className="h-[300px] flex items-center justify-center border border-dashed border-border rounded-lg bg-bg-secondary/50">
-                <p className="text-sm text-muted-foreground italic">Chart will be rendered here once you have historical data.</p>
+              <div className="h-[300px] w-full mt-4">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={chartData}>
+                    <defs>
+                      <linearGradient id="dashRevenue" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.2} />
+                        <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
+                      </linearGradient>
+                      <linearGradient id="dashProfit" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.2} />
+                        <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#374151" />
+                    <XAxis
+                      dataKey="name"
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fontSize: 10, fill: '#9ca3af' }}
+                    />
+                    <YAxis
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fontSize: 10, fill: '#9ca3af' }}
+                    />
+                    <Tooltip
+                      contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
+                      itemStyle={{ fontSize: '11px' }}
+                    />
+                    <Area type="monotone" dataKey="revenue" stroke="#8b5cf6" strokeWidth={2} fillOpacity={1} fill="url(#dashRevenue)" />
+                    <Area type="monotone" dataKey="profit" stroke="#10b981" strokeWidth={2} fillOpacity={1} fill="url(#dashProfit)" />
+                  </AreaChart>
+                </ResponsiveContainer>
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="card">
-                <h3 className="card-title mb-4">Top Performing Sites</h3>
+                <h3 className="card-title mb-4">Top Targets</h3>
                 <div className="space-y-4">
-                  {stats.totalWebsites === 0 ? (
-                    <p className="text-xs text-muted-foreground italic">No websites in inventory yet.</p>
-                  ) : (
-                    <p className="text-xs text-muted-foreground italic">Waiting for more order data to calculate performance.</p>
-                  )}
+                  <div className="p-4 rounded-xl bg-bg-secondary border border-border border-dashed flex flex-col items-center justify-center text-center">
+                    <ChartIcon size={32} className="text-muted-foreground opacity-20 mb-2" />
+                    <p className="text-xs text-muted-foreground italic">Coming soon: Top websites by order volume.</p>
+                  </div>
                 </div>
               </div>
 
               <div className="card">
-                <h3 className="card-title mb-4">Category Distribution</h3>
-                <div className="h-[180px] flex items-center justify-center border border-dashed border-border rounded-lg bg-bg-secondary/50 mb-4">
-                  <p className="text-xs text-muted-foreground italic">Collecting categorical data...</p>
+                <h3 className="card-title mb-4">Quick Actions</h3>
+                <div className="grid grid-cols-2 gap-2">
+                  <button className="flex flex-col items-center p-3 rounded-xl bg-bg-secondary hover:bg-bg-hover border border-border transition-colors">
+                    < Globe size={16} className="text-accent mb-2" />
+                    <span className="text-[10px] font-bold">New Site</span>
+                  </button>
+                  <button className="flex flex-col items-center p-3 rounded-xl bg-bg-secondary hover:bg-bg-hover border border-border transition-colors">
+                    < Users size={16} className="text-success mb-2" />
+                    <span className="text-[10px] font-bold">New Client</span>
+                  </button>
+                  <button className="flex flex-col items-center p-3 rounded-xl bg-bg-secondary hover:bg-bg-hover border border-border transition-colors">
+                    < ShoppingCart size={16} className="text-info mb-2" />
+                    <span className="text-[10px] font-bold">New Order</span>
+                  </button>
+                  <button className="flex flex-col items-center p-3 rounded-xl bg-bg-secondary hover:bg-bg-hover border border-border transition-colors">
+                    < AlertCircle size={16} className="text-warning mb-2" />
+                    <span className="text-[10px] font-bold">Log Event</span>
+                  </button>
                 </div>
               </div>
             </div>
@@ -131,12 +193,12 @@ export default function DashboardPage() {
             <div className="card border-l-4 border-l-warning">
               <div className="flex items-center gap-2 mb-4">
                 <AlertCircle className="w-4 h-4 text-warning" />
-                <h3 className="card-title">Urgent Alerts</h3>
+                <h3 className="card-title">Notifications</h3>
               </div>
               <div className="space-y-3">
                 <div className="p-3 rounded-lg bg-bg-hover border border-border">
-                  <p className="text-xs font-semibold text-info mb-1">Welcome!</p>
-                  <p className="text-xs text-text-secondary leading-relaxed">System is now connected to live Supabase database.</p>
+                  <p className="text-[10px] uppercase font-black text-info mb-1 tracking-tighter">System Live</p>
+                  <p className="text-xs text-text-secondary leading-relaxed">Full CRUD operations are now active across all modules.</p>
                 </div>
               </div>
             </div>
@@ -151,11 +213,12 @@ export default function DashboardPage() {
                   <p className="text-xs text-muted-foreground italic">No recent activity found.</p>
                 ) : (
                   recentActivity.map((act: any, i: number) => (
-                    <div key={i} className="flex gap-3">
+                    <div key={i} className="flex gap-3 items-start">
                       <div className="w-1.5 h-1.5 rounded-full bg-accent mt-1.5 flex-shrink-0 shadow-glow" />
                       <div>
-                        <p className="text-xs text-text-primary">
-                          <span className="font-bold">{act.user_email || 'System'}</span> {act.action === 'create' ? 'added' : act.action} <span className="text-accent underline cursor-pointer">{act.record_label}</span> in {act.module}
+                        <p className="text-[11px] leading-snug">
+                          <span className="text-muted-foreground uppercase text-[9px] font-bold block mb-0.5">{act.module}</span>
+                          <span className="font-bold text-accent">{act.action}</span> - {act.record_label}
                         </p>
                         <p className="text-[10px] text-muted-foreground mt-0.5">
                           {formatDistanceToNow(new Date(act.created_at), { addSuffix: true })}
@@ -175,15 +238,17 @@ export default function DashboardPage() {
 
 function StatsCard({ title, value, label, icon: Icon, trend, color }: any) {
   return (
-    <div className="stat-card">
+    <div className="stat-card group hover:scale-[1.03] transition-all duration-300 cursor-default">
       <div className={cn("stat-card-icon", color)}>
         <Icon size={20} />
       </div>
-      <div className="stat-card-value">{value}</div>
-      <div className="stat-card-label">{title}</div>
-      <div className={cn("stat-card-change", trend === 'up' ? 'up' : 'down')}>
+      <div className="mt-1">
+        <div className="stat-card-value text-2xl font-black">{value}</div>
+        <div className="stat-card-label text-[10px] font-bold text-muted-foreground uppercase mt-1">{title}</div>
+      </div>
+      <div className={cn("stat-card-change mt-2", trend === 'up' ? 'up' : 'down')}>
         {trend === 'up' ? <ArrowUpRight className="inline w-3 h-3 mr-0.5" /> : <ArrowDownRight className="inline w-3 h-3 mr-0.5" />}
-        {label}
+        <span className="text-[10px] font-medium">{label}</span>
       </div>
     </div>
   )

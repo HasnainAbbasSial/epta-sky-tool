@@ -64,3 +64,69 @@ export async function getOrders(filters?: any) {
 
     return data
 }
+
+export async function updateOrder(id: string, data: OrderFormData) {
+    const supabase = await createClient()
+
+    const { data: updated, error } = await supabase
+        .from('orders')
+        .update(data)
+        .eq('id', id)
+        .select()
+        .single()
+
+    if (error) throw error
+
+    // Log Activity
+    await supabase.from('activity_logs').insert([
+        {
+            action: 'update',
+            module: 'orders',
+            record_id: id,
+            record_label: updated.order_reference,
+            details: { ref: updated.order_reference, status: updated.order_status }
+        }
+    ])
+
+    revalidatePath('/orders')
+    revalidatePath('/')
+
+    return updated
+}
+
+export async function deleteOrder(id: string) {
+    const supabase = await createClient()
+
+    // 1. Get order details to update website count
+    const { data: order } = await supabase
+        .from('orders')
+        .select('order_reference, website_id')
+        .eq('id', id)
+        .single()
+
+    if (!order) return
+
+    // 2. Delete order
+    const { error } = await supabase
+        .from('orders')
+        .delete()
+        .eq('id', id)
+
+    if (error) throw error
+
+    // 3. Decrement Website "times_ordered" count
+    await supabase.rpc('decrement_website_orders', { row_id: order.website_id })
+
+    // 4. Log Activity
+    await supabase.from('activity_logs').insert([
+        {
+            action: 'delete',
+            module: 'orders',
+            record_id: id,
+            record_label: order.order_reference
+        }
+    ])
+
+    revalidatePath('/orders')
+    revalidatePath('/')
+}

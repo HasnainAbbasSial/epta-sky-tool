@@ -57,6 +57,35 @@ export async function getClients(search?: string) {
     return data
 }
 
+export async function updateClientRecord(id: string, data: ClientFormData) {
+    const supabase = await createClient()
+
+    const { data: updated, error } = await supabase
+        .from('clients')
+        .update(data)
+        .eq('id', id)
+        .select()
+        .single()
+
+    if (error) throw error
+
+    // Log Activity
+    await supabase.from('activity_logs').insert([
+        {
+            action: 'update',
+            module: 'clients',
+            record_id: id,
+            record_label: updated.name,
+            details: { name: updated.name, company: updated.company_name }
+        }
+    ])
+
+    revalidatePath('/clients')
+    revalidatePath('/')
+
+    return updated
+}
+
 export async function deleteClient(id: string) {
     const supabase = await createClient()
 
