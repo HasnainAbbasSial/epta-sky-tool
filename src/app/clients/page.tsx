@@ -1,3 +1,5 @@
+'use client'
+
 import { useState, useEffect } from 'react'
 import { Header } from '@/components/layout/Header'
 import { Plus, Search, Mail, Phone, ExternalLink, MoreVertical, Briefcase, Globe } from 'lucide-react'

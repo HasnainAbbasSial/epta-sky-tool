@@ -1,3 +1,5 @@
+'use client'
+
 import { cn, formatCurrency } from '@/lib/utils'
 import { getDashboardStats } from '@/lib/actions/dashboard'
 import { useEffect, useState } from 'react'
