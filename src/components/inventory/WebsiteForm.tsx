@@ -52,6 +52,7 @@ const websiteSchema = z.object({
     publisher_whatsapp: z.string().optional(),
     publisher_skype: z.string().optional(),
     publisher_other_contact: z.string().optional(),
+    preferred_contact: z.string().optional(),
     payment_method: z.string().default('paypal'),
 
     min_word_count: z.number().nullable().optional(),
@@ -63,6 +64,10 @@ const websiteSchema = z.object({
     max_external_links: z.number().nullable().optional(),
     sample_post_url: z.string().optional(),
     guidelines_notes: z.string().optional(),
+
+    tags: z.array(z.string()).optional(),
+    last_price_updated: z.string().nullable().optional(),
+    created_by: z.string().nullable().optional(),
 })
 
 interface WebsiteFormProps {
@@ -71,6 +76,8 @@ interface WebsiteFormProps {
     onSubmit: (data: WebsiteFormData) => void
     isLoading?: boolean
 }
+
+type WebsiteFormValues = z.infer<typeof websiteSchema>
 
 const TABS = [
     { id: 'basic', label: 'Basic Info', icon: Globe },
@@ -89,8 +96,8 @@ export function WebsiteForm({ initialData, onCancel, onSubmit, isLoading }: Webs
         watch,
         setValue,
         formState: { errors }
-    } = useForm<WebsiteFormData>({
-        resolver: zodResolver(websiteSchema),
+    } = useForm({
+        resolver: zodResolver(websiteSchema) as any,
         defaultValues: {
             status: 'active',
             type: 'general',
@@ -110,16 +117,16 @@ export function WebsiteForm({ initialData, onCancel, onSubmit, isLoading }: Webs
     const formRating = watch('internal_rating') || 3
 
     const toggleCategory = (cat: string) => {
-        const current = [...formCategories]
+        const current = [...(formCategories as string[])]
         if (current.includes(cat)) {
-            setValue('categories', current.filter(c => c !== cat))
+            setValue('categories', current.filter(c => c !== cat) as any)
         } else {
-            setValue('categories', [...current, cat])
+            setValue('categories', [...current, cat] as any)
         }
     }
 
     return (
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+        <form onSubmit={handleSubmit(onSubmit as any)} className="space-y-6">
             {/* Tab Navigation */}
             <div className="flex flex-wrap gap-2 p-1 bg-bg-secondary rounded-lg border border-border">
                 {TABS.map(tab => {
