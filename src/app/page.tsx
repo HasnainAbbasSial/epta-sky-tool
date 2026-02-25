@@ -5,16 +5,7 @@ import { getDashboardStats } from '@/lib/actions/dashboard'
 import { useEffect, useState } from 'react'
 import { formatDistanceToNow } from 'date-fns'
 import { Header } from '@/components/layout/Header'
-import {
-  Globe,
-  Users,
-  TrendingUp,
-  ShoppingCart,
-  AlertCircle,
-  Clock,
-  ArrowUpRight,
-  ArrowDownRight
-} from 'lucide-react'
+import { Globe, Users, TrendingUp, ShoppingCart, AlertCircle, Clock, ArrowUpRight, ArrowDownRight } from 'lucide-react'
 
 export default function DashboardPage() {
   const [data, setData] = useState<any>(null)
